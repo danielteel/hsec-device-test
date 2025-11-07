@@ -39,6 +39,7 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
 
     uint8_t* hours=data+1;
     uint8_t* minutes=data+2;
+    uint8_t* seconds=data+3;
 
     uint8_t* red=data+1;
     uint8_t* green=data+2;
@@ -53,7 +54,7 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
             storageData.green=*green;
             storageData.blue=*blue;
             commitStorage(storageData);
-            NetClient.sendString(String("color=")+String(storageData.red, 16)+","+String(storageData.green, 16)+","+String(storageData.blue, 16));
+            NetClient.sendString(String("color=")+String(storageData.red)+","+String(storageData.green)+","+String(storageData.blue));
             break;
         case 1:
             storageData.lightOn=*boolVal;
