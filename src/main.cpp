@@ -66,7 +66,7 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
 
 void onConnected(){
     Serial.println("NetClient Connected");
-    NetClient.sendString(String("color=")+String(storageData.red, 16)+","+String(storageData.green, 16)+","+String(storageData.blue, 16));
+    NetClient.sendString(String("color=")+String(storageData.red)+","+String(storageData.green)+","+String(storageData.blue));
     NetClient.sendString(String("lightOn=")+String(storageData.lightOn?"1":"0"));
 }
 
