@@ -37,9 +37,7 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
     sensor_t * s;
     int32_t* numValue=(int32_t*)(data+1);
 
-    uint8_t* hours=data+1;
-    uint8_t* minutes=data+2;
-    uint8_t* seconds=data+3;
+    DanTime* time=(DanTime*)(data+1);
 
     uint8_t* red=data+1;
     uint8_t* green=data+2;
@@ -61,6 +59,14 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
             commitStorage(storageData);
             NetClient.sendString(String("lightOn=")+String(storageData.lightOn?"1":"0"));
             break;
+        case 2:
+            storageData.startTime=*time;
+            NetClient.sendString(String("startTime=")+String(storageData.startTime.hours)+String(":")+String(storageData.startTime.minutes)+String(":")+String(storageData.startTime.seconds));
+            break;
+        case 3:
+            storageData.endTime=*time;
+            NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
+            break;
     }
 }
 
@@ -68,6 +74,9 @@ void onConnected(){
     Serial.println("NetClient Connected");
     NetClient.sendString(String("color=")+String(storageData.red)+","+String(storageData.green)+","+String(storageData.blue));
     NetClient.sendString(String("lightOn=")+String(storageData.lightOn?"1":"0"));
+    NetClient.sendString(String("startTime=")+String(storageData.startTime.hours)+String(":")+String(storageData.startTime.minutes)+String(":")+String(storageData.startTime.seconds));
+    NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
+    NetClient.sendString(String("inTimeWindow=Not sure yet"));
 }
 
 void onDisconnected(){
@@ -135,6 +144,8 @@ void setup(){
     defaultStorage.green=255;
     defaultStorage.blue=255;
     defaultStorage.lightOn=true;
+    defaultStorage.startTime={20, 0, 0};
+    defaultStorage.endTime={21, 0, 0};
     initStorage(&defaultStorage, storageData);
 
     //Setup WiFi
@@ -188,6 +199,13 @@ void loop(){
                 struct tm timeinfo;
                 if(getLocalTime(&timeinfo, 0)){
                     NetClient.sendString(String("currentTime=")+String(timeinfo.tm_hour)+String(":")+String(timeinfo.tm_min)+":"+String(timeinfo.tm_sec));
+                }
+
+                DanTime currentTime={timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec};
+                if (isInTimeWindow(&currentTime, &storageData.startTime, &storageData.endTime)){
+                    NetClient.sendString(String("inTimeWindow=We are in the time window"));
+                }else{
+                    NetClient.sendString(String("inTimeWindow=Not in the time window"));
                 }
             }
         }
