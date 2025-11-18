@@ -67,6 +67,9 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
             storageData.endTime=*time;
             NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
             break;
+        case 0xFF:
+            Serial.println(String(data+1, dataLength-1));
+            break;
     }
 }
 
@@ -77,6 +80,7 @@ void onConnected(){
     NetClient.sendString(String("startTime=")+String(storageData.startTime.hours)+String(":")+String(storageData.startTime.minutes)+String(":")+String(storageData.startTime.seconds));
     NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
     NetClient.sendString(String("inTimeWindow=Not sure yet"));
+    NetClient.sendString(String("subscribe:Greenhouse"));
 }
 
 void onDisconnected(){
