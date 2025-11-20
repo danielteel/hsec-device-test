@@ -73,6 +73,66 @@ void Net::setOnDisconnected(void (*callback)(void)){
     onDisconnected=callback;
 }
 
+void Net::setOnValueUpdate(void (*callback)(ValueSubscription*)) {
+    onValueUpdate = callback;
+}
+
+void Net::subscribeToValue(String deviceName, String valueName, VALUETYPE valueType) {
+    if (findSubscription(deviceName, valueName))
+        return; // Already subscribed
+
+    ValueSubscription sub;
+    sub.device = deviceName;      // store original casing
+    sub.valueName = valueName;
+    sub.valueType = valueType;
+
+    sub.device.trim();
+    sub.device.toLowerCase();
+    sub.valueName.trim();
+    sub.valueName.toLowerCase();
+
+    subscriptions.push_back(sub);
+
+    String msg = "subscribe:" + deviceName + ":" + valueName;
+    sendString(msg);
+}
+
+void Net::unsubscribeToValue(String deviceName, String valueName) {
+    String fmtDeviceName = deviceName;
+    String fmtValueName = valueName;
+    
+    fmtDeviceName.trim();
+    fmtDeviceName.toLowerCase();
+    fmtValueName.trim();
+    fmtValueName.toLowerCase();
+
+    for (auto it = subscriptions.begin(); it != subscriptions.end(); ++it) {
+        if (it->device.equals(fmtDeviceName) && it->valueName.equals(valueName)) {
+            subscriptions.erase(it);
+
+            String msg = "unsubscribe:" + deviceName + ":" + valueName;
+            sendString(msg);
+            return;
+        }
+    }
+}
+
+ValueSubscription* Net::findSubscription(const String& device, const String& valName) {
+    String deviceName = device;
+    String valueName = valName;
+    deviceName.trim();
+    deviceName.toLowerCase();
+    valueName.trim();
+    valueName.toLowerCase();
+    for (auto &sub : subscriptions) {
+        if (sub.device.equals(device) &&
+            sub.valueName.equals(valueName)) {
+            return &sub;
+        }
+    }
+    return nullptr;
+}
+
 bool Net::sendString(String str){
     if (str){
         return sendPacket((uint8_t*)str.c_str(), str.length());

@@ -122,6 +122,7 @@ uint8_t* encrypt(uint32_t handshake, const uint8_t* data, uint32_t dataLength, u
 
 
 uint8_t* decrypt(uint32_t& handshake, uint8_t* data, uint32_t dataLength, uint32_t& decryptedLength, const uint8_t* key, bool& error) {
+    if (dataLength<8)
     error=false;
 
     for (uint8_t k = 31; k >= 0 && k != 0xFF; k--) {

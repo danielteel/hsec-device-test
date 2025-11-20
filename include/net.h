@@ -1,5 +1,7 @@
 #pragma once
 #include <WiFiClient.h>
+#include <vector>
+#include "utils.h"
 
 enum NETSTATUS {
     NOTHING,
@@ -15,6 +17,32 @@ enum RECVSTATE {
     PAYLOAD
 };
 
+enum VALUETYPE {
+    INT32,
+    DOUBLE,
+    BOOL,
+    TIME,
+    COLOR,
+    STRING
+};
+
+typedef struct {
+    String device;
+    String valueName;
+    VALUETYPE valueType;
+
+    union {
+        int32_t int32Val;
+        double doubleVal;
+        bool boolVal;
+        DanTime timeVal;
+        DanColor colorVal;
+    } value;
+
+    String stringVal;
+
+} ValueSubscription;
+
 
 class Net {
     public:
@@ -27,9 +55,13 @@ class Net {
         
         bool ready();
         
+        void subscribeToValue(String deviceName, String valueName, VALUETYPE valueType);
+        void unsubscribeToValue(String deviceName, String valueName);
+
         void setPacketReceivedCallback(void (*packetReceivedCallback)(uint8_t*, uint32_t));
         void setOnConnected(void (*onConnected)(void));
         void setOnDisconnected(void (*onDisconnected)(void));
+        void setOnValueUpdate(void (*onValueUpdate)(ValueSubscription*));
 
     private:
         WiFiClient Client;
@@ -52,9 +84,13 @@ class Net {
 
         bool wasConnected=false;
 
+        std::vector<ValueSubscription> subscriptions;
+        ValueSubscription* findSubscription(const String& device, const String& valueName);
+
         void (*packetReceived)(uint8_t* data, uint32_t dataLength)=nullptr;
         void (*onConnected)()=nullptr;
         void (*onDisconnected)()=nullptr;
+        void (*onValueUpdate)(ValueSubscription*) = nullptr;
 
     private:
         void errorOccured(String errorText);
@@ -63,4 +99,5 @@ class Net {
         void byteReceived(uint8_t data);
         void packetRecieved(uint32_t recvdHandshake, uint8_t* data, uint32_t dataLength);
         void processIncoming();
+        void handleIncomingSubscriptionPacket(uint8_t* data, uint32_t len);
 };

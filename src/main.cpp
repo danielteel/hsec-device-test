@@ -39,18 +39,16 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
 
     DanTime* time=(DanTime*)(data+1);
 
-    uint8_t* red=data+1;
-    uint8_t* green=data+2;
-    uint8_t* blue=data+3;
+    DanColor* color=(DanColor*)(data+1);
 
     bool* boolVal=(bool*)data+1;
 
 
     switch (data[0]){
         case 0:
-            storageData.red=*red;
-            storageData.green=*green;
-            storageData.blue=*blue;
+            storageData.red=color->red;
+            storageData.green=color->green;
+            storageData.blue=color->blue;
             commitStorage(storageData);
             NetClient.sendString(String("color=")+String(storageData.red)+","+String(storageData.green)+","+String(storageData.blue));
             break;
@@ -80,7 +78,8 @@ void onConnected(){
     NetClient.sendString(String("startTime=")+String(storageData.startTime.hours)+String(":")+String(storageData.startTime.minutes)+String(":")+String(storageData.startTime.seconds));
     NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
     NetClient.sendString(String("inTimeWindow=Not sure yet"));
-    NetClient.sendString(String("subscribe:Greenhouse"));
+    NetClient.sendString(String("subscribe:Greenhouse:temperature"));
+    NetClient.sendString(String("subscribe:solar:humidity"));
 }
 
 void onDisconnected(){
