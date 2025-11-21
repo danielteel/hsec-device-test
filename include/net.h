@@ -100,4 +100,5 @@ class Net {
         void packetRecieved(uint32_t recvdHandshake, uint8_t* data, uint32_t dataLength);
         void processIncoming();
         void handleIncomingSubscriptionPacket(uint8_t* data, uint32_t len);
+        void valueUpdateRecieved(uint8_t* data, uint32_t dataLength);
 };

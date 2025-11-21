@@ -3,7 +3,7 @@
 #include "encro.h"
 #include "net.h"
 #include "utils.h"
-
+#include "parse.h"
 
 Net::Net(String deviceName, String encroKeyString, String address, uint16_t port){
     this->deviceName=deviceName;
@@ -93,8 +93,10 @@ void Net::subscribeToValue(String deviceName, String valueName, VALUETYPE valueT
 
     subscriptions.push_back(sub);
 
-    String msg = "subscribe:" + deviceName + ":" + valueName;
-    sendString(msg);
+    if (ready()){
+        String msg = "subscribe:" + deviceName + ":" + valueName;
+        sendString(msg);
+    }
 }
 
 void Net::unsubscribeToValue(String deviceName, String valueName) {
@@ -110,8 +112,10 @@ void Net::unsubscribeToValue(String deviceName, String valueName) {
         if (it->device.equals(fmtDeviceName) && it->valueName.equals(valueName)) {
             subscriptions.erase(it);
 
-            String msg = "unsubscribe:" + deviceName + ":" + valueName;
-            sendString(msg);
+            if (ready()){
+                String msg = "unsubscribe:" + deviceName + ":" + valueName;
+                sendString(msg);
+            }
             return;
         }
     }
@@ -170,6 +174,74 @@ bool Net::sendPacket(uint8_t* data, uint32_t dataLength){
     return false;
 }
 
+void Net::valueUpdateRecieved(uint8_t* data, uint32_t dataLength){
+    DanParser parser;
+    String deviceName, valueName;
+
+    parser.setInputText(String(data, dataLength));
+
+    if (!parser.getName(deviceName)) return;
+    if (!parser.match(':')) return;
+    if (!parser.getName(valueName)) return;
+    if (!parser.match('=')) return;
+
+    deviceName.toLowerCase();
+    deviceName.trim();
+    valueName.toLowerCase();
+    valueName.trim();
+
+    ValueSubscription* valueSubscription = findSubscription(deviceName, valueName);
+    if (valueSubscription){
+        int32_t int32Val;
+        double doubleVal;
+        DanColor colorVal;
+        DanTime timeVal;
+        
+        switch (valueSubscription->valueType){
+            case VALUETYPE::BOOL:
+                if (!parser.getInt32(int32Val)) return;
+                valueSubscription->value.boolVal=(bool)int32Val;
+                break;
+            case VALUETYPE::COLOR:
+                if (!parser.getInt32(int32Val)) return;
+                if (!parser.match(',')) return;
+                colorVal.red=int32Val;
+                if (!parser.getInt32(int32Val)) return;
+                if (!parser.match(',')) return;
+                colorVal.green=int32Val;
+                if (!parser.getInt32(int32Val)) return;
+                colorVal.blue=int32Val;
+                valueSubscription->value.colorVal=colorVal;
+                break;
+            case VALUETYPE::TIME:
+                if (!parser.getInt32(int32Val)) return;
+                if (!parser.match(':')) return;
+                timeVal.hours=int32Val;
+                if (!parser.getInt32(int32Val)) return;
+                if (!parser.match(':')) return;
+                timeVal.minutes=int32Val;
+                if (!parser.getInt32(int32Val)) return;
+                timeVal.seconds=int32Val;
+                valueSubscription->value.timeVal=timeVal;
+                break;
+            case VALUETYPE::INT32:
+                if (!parser.getInt32(int32Val)) return;
+                valueSubscription->value.int32Val=int32Val;
+                break;
+            case VALUETYPE::DOUBLE:
+                if (!parser.getDouble(doubleVal)) return;
+                valueSubscription->value.doubleVal=doubleVal;
+                break;
+            case VALUETYPE::STRING:
+                if (!parser.getText(valueSubscription->stringVal)) return;
+                break;
+            default:
+                return;
+        }
+        if (onValueUpdate) onValueUpdate(valueSubscription);
+    }
+}
+
 void Net::packetRecieved(uint32_t recvdHandshake, uint8_t* data, uint32_t dataLength){
     if (netStatus==NETSTATUS::INITIAL_SENT){
             serversHandshake=recvdHandshake+1;
@@ -177,10 +249,19 @@ void Net::packetRecieved(uint32_t recvdHandshake, uint8_t* data, uint32_t dataLe
             wasConnected=true;
             if (onConnected) onConnected();
 
+            for (auto it = subscriptions.begin(); it != subscriptions.end(); ++it){
+                String msg = "subscribe:" + it->device + ":" + it->valueName;
+                sendString(msg);
+            }
+
     }else if (netStatus==NETSTATUS::READY){
         if (recvdHandshake==serversHandshake){
             serversHandshake++;
-            if (packetReceived) packetReceived(data, dataLength);
+            if (data && data[0]==0xFF){
+                valueUpdateRecieved(data+1, dataLength-1);
+            }else{
+                if (packetReceived) packetReceived(data, dataLength);
+            }
         }else{
             //throw error, wrong handshake from expected
             String errorText="Wrong handshake, expected ";

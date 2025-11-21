@@ -20,6 +20,7 @@ const uint32_t weatherPeriod = 1000;
 
 const uint32_t howLongBeforeRestartIfNotConnecting = 300000;//restart esp32 if havent been able to connect to server for 5 minutes
 
+DanColor temperatureColor;
 
 const char* ntpServer1 = "pool.ntp.org";
 const char* ntpServer2 = "time.google.com";
@@ -71,6 +72,50 @@ void packetReceived(uint8_t* data, uint32_t dataLength){
     }
 }
 
+DanColor temperatureToColor(double temperature) {
+    DanColor color;
+
+    const double minTemp = 66.5;
+    const double maxTemp = 72.0;
+
+    if (temperature <= minTemp) {
+        color.red = 0;
+        color.green = 0;
+        color.blue = 255; // solid blue
+    } else if (temperature >= maxTemp) {
+        color.red = 255;
+        color.green = 0;
+        color.blue = 0;   // solid red
+    } else {
+        // scale 0 → 1 for interpolation
+        double t = (temperature - minTemp) / (maxTemp - minTemp);
+
+        // simple linear interpolation between blue (0,0,255) and red (255,0,0)
+        color.red = (uint8_t)(t * 255);
+        color.green = 0;
+        color.blue = (uint8_t)((1.0 - t) * 255);
+    }
+
+    return color;
+}
+
+
+void onValueUpdate(ValueSubscription* update){
+    if (!update) return;
+
+    if (update->device.equalsIgnoreCase("greenhouse")){
+        if (update->valueName.equalsIgnoreCase("temperature")){
+            temperatureColor=temperatureToColor(update->value.doubleVal);
+            NetClient.sendString(String("temperatureColor=")+String(temperatureColor.red)+","+String(temperatureColor.green)+","+String(temperatureColor.blue));
+        }
+    }else if (update->device.equalsIgnoreCase("solar")){
+        if (update->valueName.equalsIgnoreCase("onTime")){
+            DanTime time=update->value.timeVal;
+            NetClient.sendString(String("solarOnTime=")+String(time.hours)+String(":")+String(time.minutes)+String(":")+String(time.seconds));
+        }
+    }
+}
+
 void onConnected(){
     Serial.println("NetClient Connected");
     NetClient.sendString(String("color=")+String(storageData.red)+","+String(storageData.green)+","+String(storageData.blue));
@@ -78,8 +123,6 @@ void onConnected(){
     NetClient.sendString(String("startTime=")+String(storageData.startTime.hours)+String(":")+String(storageData.startTime.minutes)+String(":")+String(storageData.startTime.seconds));
     NetClient.sendString(String("endTime=")+String(storageData.endTime.hours)+String(":")+String(storageData.endTime.minutes)+String(":")+String(storageData.endTime.seconds));
     NetClient.sendString(String("inTimeWindow=Not sure yet"));
-    NetClient.sendString(String("subscribe:Greenhouse:temperature"));
-    NetClient.sendString(String("subscribe:solar:humidity"));
 }
 
 void onDisconnected(){
@@ -158,6 +201,8 @@ void setup(){
     NetClient.setPacketReceivedCallback(&packetReceived);
     NetClient.setOnConnected(&onConnected);
     NetClient.setOnDisconnected(&onDisconnected);
+    NetClient.setOnValueUpdate(&onValueUpdate);
+    NetClient.subscribeToValue("greenhouse", "temperature", VALUETYPE::DOUBLE);
 }
 
 void loop(){
@@ -204,7 +249,7 @@ void loop(){
                     NetClient.sendString(String("currentTime=")+String(timeinfo.tm_hour)+String(":")+String(timeinfo.tm_min)+":"+String(timeinfo.tm_sec));
                 }
 
-                DanTime currentTime={timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec};
+                DanTime currentTime={(uint8_t)timeinfo.tm_hour, (uint8_t)timeinfo.tm_min, (uint8_t)timeinfo.tm_sec};
                 if (isInTimeWindow(&currentTime, &storageData.startTime, &storageData.endTime)){
                     NetClient.sendString(String("inTimeWindow=We are in the time window"));
                 }else{
@@ -221,6 +266,6 @@ void loop(){
     if (storageData.lightOn){
         neopixelWrite(RGB_BUILTIN, storageData.red, storageData.green, storageData.blue);
     }else{
-        neopixelWrite(RGB_BUILTIN, 0, 0, 0);
+        neopixelWrite(RGB_BUILTIN, temperatureColor.red, temperatureColor.green, temperatureColor.blue);
     }
 }
