@@ -9,6 +9,7 @@
 #include "net.h"
 #include <time.h> 
 #include "storage.h"
+#include "DHTesp.h"
 
 
 const char *WiFiSSID = SECRET_WIFI_SSID;
@@ -16,7 +17,7 @@ const char *WiFiPass = SECRET_WIFI_PASS;
 
 Net NetClient(SECRET_DEVICE_NAME, SECRET_ENCROKEY, SECRET_HOST_ADDRESS, SECRET_HOST_PORT);
 
-const uint32_t weatherPeriod = 1000;
+const uint32_t weatherPeriod = 2000;
 
 const uint32_t howLongBeforeRestartIfNotConnecting = 300000;//restart esp32 if havent been able to connect to server for 5 minutes
 
@@ -30,6 +31,9 @@ const char* timeZone = "MST7MDT,M3.2.0,M11.1.0";//https://github.com/nayarsystem
 StorageData storageData;
 
 
+
+const uint8_t dhtPin = 47;
+DHTesp dht;
 
 Adafruit_BME280 bme(39, 40, 41, 42); // use I2C interface
 Adafruit_BME280 bme2(13, 10, 11, 12); // use I2C interface
@@ -161,6 +165,9 @@ void setup(){
     Serial.begin(115200);
     Serial.println("Initializing...");
 
+
+    dht.setup(dhtPin, DHTesp::DHT22);
+
     if (!bme.begin()){
         Serial.println(F("Could not find a valid BME280 sensor #1, check wiring!"));
     }
@@ -243,6 +250,11 @@ void loop(){
                 float temperature2 = bme2.readTemperature()*1.8f+32.0f;
                 NetClient.sendString(String("humidity2=")+String(humidity2, 1));
                 NetClient.sendString(String("temperature2=")+String(temperature2, 1));
+
+                float dhtHumidity = dht.getHumidity();
+                float dhtTemperature = dht.getTemperature()*1.8f+32.0f;
+                NetClient.sendString(String("dhtHumidity=")+String(dhtHumidity, 1));
+                NetClient.sendString(String("dhtTemperature=")+String(dhtTemperature, 1));
 
                 struct tm timeinfo;
                 if(getLocalTime(&timeinfo, 0)){
